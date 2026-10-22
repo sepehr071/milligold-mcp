@@ -1,0 +1,32 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sepehr071/milligold-mcp",
+  "title": "Milli.gold Prices",
+  "description": "Unofficial read-only Milli.gold: live 18k gold price per milligram, history and platform stats.",
+  "repository": {
+    "url": "https://github.com/sepehr071/milligold-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/sepehr071/milligold-mcp",
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "milligold-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "MILLIGOLD_MCP_PROXY",
+          "description": "Optional HTTP proxy URL for milli.gold requests; system proxy settings are ignored. Also accepts a comma-separated list: one is used until it gets blocked or fails to connect, then the next.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
