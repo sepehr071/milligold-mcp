@@ -23,11 +23,23 @@ API = "https://milli.gold/api/v1/public"
 
 HEADERS = {
     # User-Agent, sec-ch-ua and TLS come from the impersonated Chrome profile (see _get_client).
-    "Accept": "application/json",
+    # Same as the site's own fetch() calls: same-origin GET, so Chrome sends no Origin header.
+    "Accept": "*/*",
     "Accept-Language": "fa-IR,fa;q=0.9,en;q=0.8",
     "sec-fetch-dest": "empty",
     "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
     "priority": "u=1, i",
+}
+# Pages, feeds and sitemaps are read the way Chrome opens a link on the site (a navigation, not an XHR).
+PAGE_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,"
+    "application/signed-exchange;v=b3;q=0.7",
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1",
+    "priority": "u=0, i",
 }
 
 MAX_CONCURRENCY = 2
@@ -50,11 +62,16 @@ _cache: dict[tuple, tuple[float, Any]] = {}
 
 
 class _XhrTransport(AsyncCurlTransport):
-    """The Chrome profile sends navigation-only headers; a None value makes curl drop them (API calls are XHR)."""
+    """The Chrome profile sends navigation-only headers; a None value makes curl drop them on XHR calls."""
 
     def _create_request_params(self, req: httpx.Request) -> dict[str, Any]:
+        # The parent drops "accept: */*" as an httpx default; curl would then send Chrome's page Accept instead.
+        accept = req.headers.get("accept")
         p = super()._create_request_params(req)
-        p["headers"] = [*p["headers"], (b"upgrade-insecure-requests", None), (b"sec-fetch-user", None)]
+        extra = [(b"cache-control", None)]  # Chrome sends max-age=0 only on a reload
+        if req.headers.get("sec-fetch-mode") != "navigate":
+            extra += [(b"upgrade-insecure-requests", None), (b"sec-fetch-user", None)]
+        p["headers"] = [*p["headers"], *extra, *([(b"accept", b"*/*")] if accept == "*/*" else [])]
         return p
 
 
@@ -138,9 +155,7 @@ async def fetch(url: str, params: dict[str, Any] | None = None, text: bool = Fal
     key = (url, tuple(sorted(query.items())), text)
     if (hit := _cache.get(key)) and time.monotonic() - hit[0] < CACHE_TTL:
         return copy.deepcopy(hit[1])
-    headers = {"Referer": f"{SITE}/", "Origin": SITE, "sec-fetch-site": "same-site"}
-    if text:
-        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    headers = {"Referer": f"{SITE}/", **(PAGE_HEADERS if text else {})}
     for attempt in range(MAX_RETRIES + 1):
         last = attempt == MAX_RETRIES
         wait = RETRY_DELAY * 2**attempt * random.uniform(1, 1.5)

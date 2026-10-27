@@ -1,6 +1,6 @@
 [project]
 name = "milligold-mcp"
-version = "0.2.0"
+version = "0.2.1"
 description = "Unofficial read-only MCP server for Milli.gold (milli.gold): live 18k gold price, price history, platform stats, fees, trade quotes, news and help."
 readme = "README.md"
 license = "MIT"

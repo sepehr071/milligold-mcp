@@ -54,3 +54,15 @@ async def test_read_page_without_body_is_error(client, api):
     api["/help/x/"] = lambda r: httpx.Response(200, text="<html><body>nothing</body></html>")
     r = await client.call_tool("mg_read", {"url": "https://milli.gold/help/x/"})
     assert r.is_error and "no article" in r.content[0].text
+
+
+async def test_requests_look_like_the_sites_own_traffic(client, api):
+    api["/api/v1/public/milli-price/external"] = {"code": 0, "data": {"date": "x", "price18": 1}}
+    api["/news/feed/"] = page("news_feed.xml")
+    await client.call_tool("mg_get_price", {})
+    await client.call_tool("mg_latest_posts", {})
+    xhr, nav = api.calls
+    assert "origin" not in xhr.headers and xhr.headers["sec-fetch-site"] == "same-origin"
+    assert xhr.headers["accept"] == "*/*" and xhr.headers["sec-fetch-mode"] == "cors"
+    assert nav.headers["sec-fetch-mode"] == "navigate" and nav.headers["sec-fetch-dest"] == "document"
+    assert "origin" not in nav.headers and nav.headers["accept"].startswith("text/html")

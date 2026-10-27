@@ -65,7 +65,8 @@ async def mg_price_history(
 ) -> dict[str, Any]:
     """Get the Milli.gold 18k gold price series for a day, week or month, with high, low and change.
 
-    Prices are Rial per milligram; `time` is Tehran time. Points are thinned evenly to `points`.
+    Prices are Rial per milligram: multiply by 100 for Toman per gram (260,000 Rial/mg = 26,000,000 Toman/g).
+    `time` is Tehran time. Points are thinned evenly to `points`.
     """
     prices = _data(await fetch(f"{API}/milli-price/widget/external"), "price history").get("prices")
     series = prices.get(period) if isinstance(prices, dict) else None
