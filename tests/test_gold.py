@@ -1,17 +1,27 @@
 import httpx
 import pytest
-from conftest import fixture
+from conftest import fixture, page
 
 from milligold_mcp import http
 
 pytestmark = pytest.mark.anyio
 
 P = "/api/v1/public"
+FEES = "/main/commision/"
 
 
 async def test_all_tools_are_read_only(client):
     tools = (await client.list_tools()).tools
-    assert {t.name for t in tools} == {"mg_get_price", "mg_price_history", "mg_platform_stats"}
+    assert {t.name for t in tools} == {
+        "mg_get_price",
+        "mg_price_history",
+        "mg_platform_stats",
+        "mg_fees",
+        "mg_trade_quote",
+        "mg_latest_posts",
+        "mg_help_topics",
+        "mg_read",
+    }
     for t in tools:
         assert t.annotations.read_only_hint is True, t.name
         assert t.description and t.title, t.name
@@ -91,3 +101,42 @@ async def test_week_stats_include_day_peak_and_live_price(client, api):
     http._cache.clear()
     r = (await client.call_tool("mg_price_history", {"period": "WEEKLY"})).structured_content
     assert r["high"] == 130 and r["last"] == 110
+
+
+async def test_fees_parse_both_tables(client, api):
+    api[FEES] = page("fees.html")
+    r = (await client.call_tool("mg_fees", {})).structured_content
+    assert r["fees"]["buy"] == {"min": "1 mg", "percent": 0.5, "max": "none"}
+    assert r["fees"]["delivery"]["min"] == "150 mg" and r["fees"]["wallet_withdrawal"]["min"] == "2000 toman"
+    r = (await client.call_tool("mg_fees", {"customer": "company"})).structured_content
+    assert r["fees"]["delivery"]["min"] == "30 mg"
+
+
+async def test_fees_layout_change_is_clear_error(client, api):
+    api[FEES] = lambda r: httpx.Response(200, text="<html><table><tr><td>x</td></tr></table></html>")
+    r = await client.call_tool("mg_fees", {})
+    assert r.is_error and "no fee table" in r.content[0].text
+
+
+async def test_trade_quote_buy_grams_adds_percent_fee(client, api):
+    api[f"{P}/milli-price/external"] = fixture("price.json")  # 268,900 Rial/mg = 26,890 Toman/mg
+    api[FEES] = page("fees.html")
+    r = (await client.call_tool("mg_trade_quote", {"side": "buy", "grams": 1})).structured_content
+    assert (r["gold_mg"], r["fee_mg"], r["value_toman"]) == (1000, 5.0, 26_890_000)
+    assert r["pay_toman"] == 26_890_000 + 134_450
+
+
+async def test_trade_quote_small_budget_pays_minimum_fee(client, api):
+    api[f"{P}/milli-price/external"] = fixture("price.json")
+    api[FEES] = page("fees.html")
+    r = (await client.call_tool("mg_trade_quote", {"side": "buy", "toman": 100_000})).structured_content
+    assert r["fee_mg"] == 1.0 and r["pay_toman"] == 100_000
+    r = (await client.call_tool("mg_trade_quote", {"side": "sell", "grams": 0.1})).structured_content
+    assert r["receive_toman"] == 2_689_000 - 26_890
+
+
+@pytest.mark.parametrize(
+    "args", [{"side": "buy"}, {"side": "buy", "grams": 1, "toman": 5}, {"side": "sell", "toman": 5}]
+)
+async def test_trade_quote_needs_one_amount(client, api, args):
+    assert (await client.call_tool("mg_trade_quote", args)).is_error

@@ -125,8 +125,8 @@ def _get_client() -> tuple[httpx.AsyncClient, asyncio.Semaphore]:
     return _client, _limit
 
 
-async def fetch(url: str, params: dict[str, Any] | None = None) -> Any:
-    """GET an endpoint and return the parsed JSON body.
+async def fetch(url: str, params: dict[str, Any] | None = None, text: bool = False) -> Any:
+    """GET an endpoint and return the parsed JSON body, or the decoded body when `text` (HTML, RSS, XML).
 
     Retried up to MAX_RETRIES times on timeout, network error, 5xx or 429, with jittered exponential
     backoff or after Retry-After when sent. 403 is never retried.
@@ -135,10 +135,12 @@ async def fetch(url: str, params: dict[str, Any] | None = None) -> Any:
     host = httpx.URL(url).host
     if host not in HOSTS:
         raise ApiError(f"Refusing to call unexpected host {host}.")
-    key = (url, tuple(sorted(query.items())))
+    key = (url, tuple(sorted(query.items())), text)
     if (hit := _cache.get(key)) and time.monotonic() - hit[0] < CACHE_TTL:
         return copy.deepcopy(hit[1])
     headers = {"Referer": f"{SITE}/", "Origin": SITE, "sec-fetch-site": "same-site"}
+    if text:
+        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
     for attempt in range(MAX_RETRIES + 1):
         last = attempt == MAX_RETRIES
         wait = RETRY_DELAY * 2**attempt * random.uniform(1, 1.5)
@@ -158,10 +160,13 @@ async def fetch(url: str, params: dict[str, Any] | None = None) -> Any:
 
     if r.status_code >= 400:
         raise ApiError(_status_message(r, host), r.status_code)
-    try:
-        body = json_lib.loads(content)
-    except ValueError as e:
-        raise ApiError(f"{host} returned a non-JSON response (HTTP {r.status_code}).", r.status_code) from e
+    if text:
+        body = content.decode("utf-8", "replace")
+    else:
+        try:
+            body = json_lib.loads(content)
+        except ValueError as e:
+            raise ApiError(f"{host} returned a non-JSON response (HTTP {r.status_code}).", r.status_code) from e
     if len(_cache) >= CACHE_MAX:
         _cache.pop(next(iter(_cache)))
     _cache[key] = (time.monotonic(), copy.deepcopy(body))

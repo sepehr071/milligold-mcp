@@ -27,13 +27,13 @@ the live gold price per gram, day, week and month price history, and platform st
 
 ## For AI agents
 
-- **What:** unofficial MCP server (model context protocol) for the public price and statistics endpoints of milli.gold. A gold price API for Iran in tool form.
+- **What:** unofficial MCP server (model context protocol) for the public price, statistics, fees, news and help pages of milli.gold. A gold price API for Iran in tool form.
 - **Install:** `uvx milligold-mcp` or `claude mcp add milligold -- uvx milligold-mcp`. Transport: stdio. Needs [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python 3.10+).
 - **Auth:** none, no API key or account. Optional `MILLIGOLD_MCP_PROXY` (HTTP proxy URL, or a comma-separated list); system proxy settings are ignored.
 - **Access:** read-only, so no confirmation is needed before calling any tool. It cannot log in, trade or read a wallet.
-- **Tools:** 3, all prefixed `mg_`. Typical sequence: `mg_get_price` -> `mg_price_history`.
-- **Use when:** the user asks for the current 18k gold price per gram on Milli.gold, how it moved over a day, week or month, or Milli.gold's headline numbers.
-- **Do not use when:** the user wants to buy or sell gold, needs a market-wide quote, or wants dollar, coin or crypto prices (see [tgju-mcp](https://github.com/sepehr071/tgju-mcp)).
+- **Tools:** 8, all prefixed `mg_`. Typical sequences: `mg_get_price` -> `mg_price_history`; `mg_trade_quote`; `mg_latest_posts` or `mg_help_topics` -> `mg_read`.
+- **Use when:** the user asks for the current 18k gold price per gram on Milli.gold, how it moved over a day, week or month, what a buy or sale costs with fees, Milli.gold's fees, its latest gold news, or how to use Milli (delivery, transfer, verification).
+- **Do not use when:** the user wants to actually buy or sell gold, needs a market-wide quote, or wants dollar, coin or crypto prices (see [tgju-mcp](https://github.com/sepehr071/tgju-mcp)).
 - **Output:** compact JSON. Milli.gold quotes **Rial per milligram** of 18k gold; replies also carry Rial per gram and Toman per gram. Times are Tehran time.
 - **Machine-readable:** [`server.json`](https://github.com/sepehr071/milligold-mcp/blob/main/server.json) and the
   [iran-mcp catalog](https://github.com/sepehr071/iran-mcp) (`TOOLS.md`, `servers.json`, `llms.txt`).
@@ -58,6 +58,9 @@ the quote straight from the public endpoints and does the unit conversion for yo
 - **Live price** of 18k gold on Milli.gold: Rial per milligram, Rial per gram and Toman per gram, with the Tehran-time timestamp
 - **Price history** for the last day, week or month, with first, last, high, low and change percent
 - **Platform statistics**: users, trade transactions, gold traded and held (kg), burned gold (kg), branches and representatives
+- **Fees** for buying, selling, transferring and delivering gold and for wallet withdrawals, read live from the fees page
+- **Trade quotes**: what buying N grams (or spending a Toman budget) costs, or what selling pays, fee included
+- **News, magazine and help**: the newest posts (daily gold, ounce and market reports), help articles found by keyword, and the full text of any post
 - **Read-only by design**: no login, no trading, no wallet
 
 Example prompts:
@@ -66,6 +69,10 @@ Example prompts:
 - "Show me Milli.gold's gold price for the last month. What were the high and the low?"
 - "Is gold up or down today on Milli.gold? Give me the change in percent."
 - "How many users and how much gold does Milli.gold report?"
+- "How much do I pay on Milli.gold for 2 grams of gold, fee included?"
+- "How do I get physical gold delivered from Milli, and what does it cost?"
+- <span dir="rtl">با ۵ میلیون تومان چند میلی طلا در میلی می&zwnj;توانم بخرم؟</span>
+- <span dir="rtl">آخرین اخبار قیمت طلا در میلی چیست؟</span>
 - <span dir="rtl">قیمت طلای ۱۸ عیار در میلی الان هر گرم چند تومان است؟</span>
 - <span dir="rtl">نمودار قیمت طلا در میلی در یک هفته گذشته چطور بوده؟</span>
 - <span dir="rtl">امروز قیمت طلا در میلی بالا رفته یا پایین آمده؟</span>
@@ -160,13 +167,18 @@ It's a standard stdio MCP server: run `uvx milligold-mcp`, or `pip install milli
 
 ## Tools
 
-All 3 tools are read-only and return compact JSON.
+All 8 tools are read-only and return compact JSON.
 
 | Tool | What it does |
 |---|---|
 | `mg_get_price` | Gets the current Milli.gold price of 18k melted gold in Rial per milligram, Rial per gram and Toman per gram, with the Tehran-time timestamp |
 | `mg_price_history` | Gets the 18k gold price series for a day, week or month (`period`: `DAILY`, `WEEKLY`, `MONTHLY`; `points`: 2-50, default 24) with first, last, high, low and change percent |
 | `mg_platform_stats` | Gets Milli.gold's headline numbers: users, trade transactions, gold traded (kg), user balances (kg), burned gold (kg), branches and representatives |
+| `mg_fees` | Gets the current fees for buying, selling, transferring and delivering gold and for wallet withdrawals (`customer`: `individual` or `company`), each as percent with minimum and maximum |
+| `mg_trade_quote` | Estimates the cost of a buy or the payout of a sale at the live price, fee included (`side`: `buy` or `sell`; `grams`, or `toman` as a buying budget) |
+| `mg_latest_posts` | Lists the newest posts with date, categories, summary and URL (`section`: `news`, `mag` or `help`; `limit`: 1-20) |
+| `mg_help_topics` | Finds help-center articles by English keyword (e.g. `delivery`, `fee`, `card`); empty query lists all |
+| `mg_read` | Reads the text of one milli.gold news, magazine or help post (`url`; `max_chars`: 500-20000, default 6000) |
 
 ## How it works
 
@@ -178,11 +190,12 @@ All 3 tools are read-only and return compact JSON.
   milligold-mcp  (runs on your machine)
       │
       │  HTTPS
-      └──────▶  milli.gold   price, price history, platform report
+      └──────▶  milli.gold   price, price history, platform report, fees page, RSS feeds, help sitemap, posts
 ```
 
-`milligold-mcp` runs locally and calls three public, login-free endpoints of milli.gold: the live price, the price
-widget series and the overall report. There is no hosted server in between and no API key.
+`milligold-mcp` runs locally and reads public, login-free parts of milli.gold: three JSON endpoints (live price,
+price widget series, overall report), the fees page, the news, magazine and help RSS feeds, the help sitemap and the
+post pages. There is no hosted server in between and no API key.
 
 - **Chrome-like client.** Requests go through a Chrome-impersonating HTTP client, because the site sits behind ArvanCloud.
 - **ArvanCloud 307 + cookie.** ArvanCloud sometimes answers with a redirect to the same URL plus a cookie. The server retries once and keeps the cookie, so you never see it.
@@ -196,6 +209,8 @@ widget series and the overall report. There is no hosted server in between and n
 - **Milli.gold's own price.** It is the platform's quote for 18k melted gold, with no tax or making charge. It is not a market-wide quote and not the tgju price, so expect small differences from other sources.
 - **History stats follow the site.** The high, low and change for a week or a month include the day's peak and the live price, like the Milli.gold page does. `points` only thins the returned series; it does not change the stats.
 - **Statistics are rounded totals** that the company publishes, with weights in kilograms.
+- **Trade quotes are estimates.** The fee is the larger of the minimum and the percent on the fees page (today 1 mg or 0.5 %). New-user fee waivers and wallet withdrawal fees are not applied, and the price moves between the quote and a real trade.
+- **Posts.** Only the newest posts are available (about 20 news, 10 magazine, 10 help); the site's feeds have no search or older pages. Help articles are found by the English words in their URLs. Post text is Persian.
 - **What it does not do.** No buying or selling, no login, no wallet or account data.
 
 ## FAQ
@@ -203,8 +218,8 @@ widget series and the overall report. There is no hosted server in between and n
 <details>
 <summary><b>Is there a Milli.gold API or MCP server for AI agents?</b></summary>
 
-Yes: `milligold-mcp` is an unofficial MCP server with 3 read-only tools. It calls the public price and statistics
-endpoints that milli.gold itself serves; no API key is needed.
+Yes: `milligold-mcp` is an unofficial MCP server with 8 read-only tools. It calls the public price and statistics
+endpoints and reads the public fees, news and help pages that milli.gold itself serves; no API key is needed.
 </details>
 
 <details>
@@ -265,13 +280,16 @@ Use the full path to `uvx` (`where uvx` on Windows, `which uvx` on macOS/Linux) 
 
 <div dir="rtl">
 
-**milligold-mcp** یک سرور MCP غیررسمی و فقط&zwnj;خواندنی برای [میلی (Milli.gold)](https://milli.gold)، پلتفرم آنلاین خرید و فروش طلای ۱۸ عیار آب&zwnj;شده به&zwnj;صورت میلی&zwnj;گرمی، است. این سرور به دستیار هوش مصنوعی شما (Claude، Cursor، Copilot و ...) اجازه می&zwnj;دهد قیمت لحظه&zwnj;ای طلا، تاریخچه قیمت و آمار پلتفرم را بخواند.
+**milligold-mcp** یک سرور MCP غیررسمی و فقط&zwnj;خواندنی برای [میلی (Milli.gold)](https://milli.gold)، پلتفرم آنلاین خرید و فروش طلای ۱۸ عیار آب&zwnj;شده به&zwnj;صورت میلی&zwnj;گرمی، است. این سرور به دستیار هوش مصنوعی شما (Claude، Cursor، Copilot و ...) اجازه می&zwnj;دهد قیمت لحظه&zwnj;ای طلا، تاریخچه قیمت، آمار پلتفرم، کارمزدها، هزینه معامله و اخبار و راهنمای میلی را بخواند.
 
 **چه کارهایی می&zwnj;کند**
 
 - **قیمت هر گرم طلای ۱۸ عیار** در میلی: ریال به ازای هر میلی&zwnj;گرم، ریال به ازای هر گرم و تومان به ازای هر گرم.
 - **تاریخچه قیمت** روز، هفته و ماه گذشته، با اولین، آخرین، بیشترین و کمترین قیمت و درصد تغییر.
 - **آمار پلتفرم**: تعداد کاربران، تعداد معاملات، طلای معامله&zwnj;شده و نگه&zwnj;داری&zwnj;شده (کیلوگرم)، طلای سوزانده&zwnj;شده و تعداد شعبه&zwnj;ها و نمایندگی&zwnj;ها.
+- **کارمزدها**: کارمزد خرید، فروش، انتقال، تحویل طلا و برداشت از کیف پول، مستقیم از صفحه کارمزدهای سایت.
+- **محاسبه هزینه معامله**: هزینه خرید چند گرم طلا (یا با یک بودجه تومانی) و مبلغ دریافتی از فروش، با کارمزد.
+- **اخبار، مجله و راهنما**: تازه&zwnj;ترین مطالب (گزارش روزانه قیمت طلا و اونس)، جستجوی مقاله&zwnj;های راهنما و خواندن متن کامل هر مطلب.
 
 **نکته&zwnj;ها**
 
