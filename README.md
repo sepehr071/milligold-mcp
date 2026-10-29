@@ -15,6 +15,7 @@ the live gold price per gram, day, week and month price history, and platform st
 [![CI](https://github.com/sepehr071/milligold-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/sepehr071/milligold-mcp/actions/workflows/ci.yml)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.sepehr071%2Fmilligold--mcp-7c3aed)](https://registry.modelcontextprotocol.io/?q=milligold-mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-16a34a)](https://github.com/sepehr071/milligold-mcp/blob/main/LICENSE)
+[![mcpfarsi](https://mcpfarsi.ir/badge/milligold.svg)](https://mcpfarsi.ir/servers/milligold/)
 
 [![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=milligold&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJtaWxsaWdvbGQtbWNwIl19)
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_milligold--mcp-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=milligold&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22milligold-mcp%22%5D%7D)
@@ -342,6 +343,7 @@ to use it. Releases: bump the version in `pyproject.toml` and `server.json`, the
 - [iran-crypto-mcp](https://github.com/sepehr071/iran-crypto-mcp) for cryptocurrency prices on Iranian exchanges
 - [tsetmc-mcp](https://github.com/sepehr071/tsetmc-mcp) for Tehran Stock Exchange data
 - [iran-mcp](https://github.com/sepehr071/iran-mcp): catalog of all Iranian-service MCP servers
+- Listed on [mcpfarsi.ir](https://mcpfarsi.ir/servers/milligold/), the Persian MCP marketplace
 
 ## Disclaimer
 

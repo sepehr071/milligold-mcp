@@ -29,6 +29,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/sepehr071/milligold-mcp"
 Issues = "https://github.com/sepehr071/milligold-mcp/issues"
+Website = "https://mcpfarsi.ir/servers/milligold/"
 
 [project.scripts]
 milligold-mcp = "milligold_mcp.server:main"
