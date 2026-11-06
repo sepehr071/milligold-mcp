@@ -45,28 +45,25 @@ def _price(rial_per_mg: int) -> dict[str, Any]:
 async def mg_get_price() -> dict[str, Any]:
     """Get the current Milli.gold price of 18k melted gold, in Rial per milligram and per gram.
 
-    Milli.gold sells gold by the milligram (1 gram = 1000 mg); the quote is the platform's own price
-    with no tax or making charge. `as_of` is Tehran time. For the trend over a day, week or month use
-    mg_price_history.
+    Platform's own price, no tax or making charge. For trends use mg_price_history.
     """
     d = _data(await fetch(f"{API}/milli-price/external"), "price")
     if not isinstance(d.get("price18"), int | float):
         raise ApiError("Milli.gold returned no price.")
-    return {"as_of": d.get("date"), **_price(d["price18"]), "karat": 18}
+    return {"as_of": d.get("date"), **_price(d["price18"])}
 
 
 @tool("Milli.gold price history")
 async def mg_price_history(
     period: Annotated[
         Literal["DAILY", "WEEKLY", "MONTHLY"],
-        Field(description="Window: DAILY = last ~24 h (15-min points), WEEKLY = last week, MONTHLY = last ~month."),
+        Field(description="DAILY = last ~24 h, WEEKLY, MONTHLY = last ~month."),
     ] = "DAILY",
-    points: Annotated[int, Field(description="Max points to return, evenly spaced (2-50).", ge=2, le=50)] = 24,
+    points: Annotated[int, Field(description="Max points, evenly spaced.", ge=2, le=50)] = 24,
 ) -> dict[str, Any]:
     """Get the Milli.gold 18k gold price series for a day, week or month, with high, low and change.
 
-    Prices are Rial per milligram: multiply by 100 for Toman per gram (260,000 Rial/mg = 26,000,000 Toman/g).
-    `time` is Tehran time. Points are thinned evenly to `points`.
+    Rial per milligram: multiply by 100 for Toman per gram. `time` is Tehran time.
     """
     prices = _data(await fetch(f"{API}/milli-price/widget/external"), "price history").get("prices")
     series = prices.get(period) if isinstance(prices, dict) else None
@@ -111,7 +108,7 @@ async def mg_price_history(
 async def mg_platform_stats() -> dict[str, Any]:
     """Get Milli.gold's headline numbers: users, trades, gold traded, gold held and branches.
 
-    Figures are rounded totals the company publishes; weights are in kilograms. For prices use mg_get_price.
+    Rounded totals the company publishes; weights in kilograms.
     """
     d = _data(await fetch(f"{API}/milli-overall-report"), "statistics")
     return {
@@ -172,37 +169,30 @@ def _fee_tables(page: str) -> dict[str, dict[str, dict[str, Any]]]:
 async def mg_fees(
     customer: Annotated[
         Literal["individual", "company"],
-        Field(description="individual = personal account, company = business account."),
+        Field(description="Account type."),
     ] = "individual",
 ) -> dict[str, Any]:
     """Get Milli.gold's current fees for buying, selling, transferring and delivering gold and for wallet withdrawals.
 
-    Read live from the site's fees page. Each fee is `percent` of the amount, but at least `min` and at most `max`
-    ('none' = no cap). 'mg' means milligrams of gold. Delivery is physical gold (bars) handed over at a branch.
-    To price a concrete trade use mg_trade_quote.
+    Each fee is `percent` of the amount, at least `min` and at most `max` ('none' = no cap); mg = milligrams of
+    gold. To price a concrete trade use mg_trade_quote.
     """
     fees = _fee_tables(await fetch(FEES_PAGE, text=True))
     if customer not in fees:
         raise ApiError(f"Milli.gold fees page has no {customer} table.")
-    return {"customer": customer, "source": FEES_PAGE, "fees": fees[customer]}
+    return {"customer": customer, "fees": fees[customer]}
 
 
 @tool("Milli.gold trade cost quote")
 async def mg_trade_quote(
-    side: Annotated[Literal["buy", "sell"], Field(description="buy = you buy gold, sell = you sell gold.")],
-    grams: Annotated[
-        float | None, Field(description="Amount of 18k gold in grams (e.g. 0.5).", gt=0, le=100_000)
-    ] = None,
-    toman: Annotated[
-        int | None, Field(description="Buy only: total budget in Toman, fee included (e.g. 5000000).", gt=0)
-    ] = None,
+    side: Annotated[Literal["buy", "sell"], Field(description="Your side of the trade.")],
+    grams: Annotated[float | None, Field(description="18k gold in grams, e.g. 0.5.", gt=0, le=100_000)] = None,
+    toman: Annotated[int | None, Field(description="Buy only: budget in Toman, fee included.", gt=0)] = None,
 ) -> dict[str, Any]:
     """Estimate what a gold trade on Milli.gold costs or pays out right now, fee included, at the live price.
 
-    Give `grams` for a buy or a sale, or `toman` (a budget, fee included) for a buy. The fee follows the fees page:
-    the larger of `min` and `percent` of the amount (today 1 mg or 0.5 %). `pay_toman` is the total for a buy,
-    `receive_toman` the payout of a sale. It is an estimate: new-user fee waivers and wallet withdrawal fees are not
-    applied, and the price moves. For the fee table itself use mg_fees.
+    Give `grams` (buy or sale) or `toman` (buy budget). Returns `pay_toman` for a buy, `receive_toman` for a sale.
+    Estimate only: new-user fee waivers and withdrawal fees are not applied. Fee table: mg_fees.
     """
     if (grams is None) == (toman is None):
         raise ApiError("Give exactly one of grams or toman.")

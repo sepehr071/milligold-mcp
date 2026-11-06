@@ -40,16 +40,13 @@ def _tag(item: str, name: str) -> str:
 async def mg_latest_posts(
     section: Annotated[
         Literal["news", "mag", "help"],
-        Field(
-            description="news = daily gold price and market news, mag = gold buying guides, help = how to use Milli."
-        ),
+        Field(description="news = daily price and market news, mag = buying guides, help = how-to articles."),
     ] = "news",
-    limit: Annotated[int, Field(description="How many posts to return, newest first (1-20).", ge=1, le=20)] = 10,
+    limit: Annotated[int, Field(description="Newest first.", ge=1, le=20)] = 10,
 ) -> dict[str, Any]:
     """List the newest posts on Milli.gold's news, magazine or help site, with date, categories, summary and URL.
 
-    News carries daily 18k gold, ounce, coin and market reports in Persian. Only the newest posts are available
-    (about 20 news, 10 mag, 10 help); there is no search or older pages. Read a full post with mg_read.
+    Persian text. Only the newest posts exist (about 20 news, 10 mag, 10 help). Read one with mg_read.
     """
     feed = await fetch(f"{SITE}/{section}/feed/", text=True)
     items = re.findall(r"<item>(.*?)</item>", feed, re.S)
@@ -80,15 +77,12 @@ async def mg_latest_posts(
 async def mg_help_topics(
     query: Annotated[
         str,
-        Field(
-            description="English keywords matched against help article URLs, e.g. 'delivery', 'fee', 'card'. Empty = all."
-        ),
+        Field(description="English keywords matched against article URLs, e.g. 'delivery'. Empty = all."),
     ] = "",
 ) -> dict[str, Any]:
     """Find Milli.gold help-center articles (how to buy, sell, deliver, transfer, verify, fees) by English keyword.
 
-    The help center has about 80 articles in Persian; their URLs are English, so match on English words. Read an
-    article with mg_read. For the fee table itself use mg_fees.
+    About 80 Persian articles with English URLs, so match on English words. Read one with mg_read.
     """
     sitemap = await fetch(f"{SITE}/help/post-sitemap.xml", text=True)
     urls = re.findall(r"<loc>(https://milli\.gold/help/[^<]+)</loc>", sitemap)
@@ -101,21 +95,19 @@ async def mg_help_topics(
         topic = " ".join(w for w in slug.split("-") if not w.isdigit())
         if all(w in topic for w in words):
             topics.append({"topic": topic, "url": url})
-    return {"query": query, "count": len(topics), "topics": topics}
+    return {"count": len(topics), "topics": topics}
 
 
 @tool("Milli.gold read post")
 async def mg_read(
     url: Annotated[
-        str, Field(description="URL of a milli.gold news, mag or help post, from mg_latest_posts or mg_help_topics.")
+        str, Field(description="milli.gold news, mag or help post URL from mg_latest_posts or mg_help_topics.")
     ],
-    max_chars: Annotated[
-        int, Field(description="Cut the text at this many characters (500-20000).", ge=500, le=20000)
-    ] = 6000,
+    max_chars: Annotated[int, Field(description="Cut text at this many characters.", ge=500, le=20000)] = 6000,
 ) -> dict[str, Any]:
     """Read the text of one Milli.gold news, magazine or help post, with tables flattened to 'a | b | c' lines.
 
-    Only milli.gold news, mag and help URLs are accepted. Text is Persian; digits stay as written on the page.
+    Persian text; only milli.gold news, mag and help URLs.
     """
     u = httpx.URL(url.strip())
     parts = u.path.strip("/").split("/")
