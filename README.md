@@ -181,28 +181,6 @@ All 8 tools are read-only and return compact JSON.
 | `mg_help_topics` | Finds help-center articles by English keyword (e.g. `delivery`, `fee`, `card`); empty query lists all |
 | `mg_read` | Reads the text of one milli.gold news, magazine or help post (`url`; `max_chars`: 500-20000, default 6000) |
 
-## How it works
-
-```text
-  AI agent  (Claude, Cursor, Copilot, ...)
-      │
-      │  MCP over stdio
-      ▼
-  milligold-mcp  (runs on your machine)
-      │
-      │  HTTPS
-      └──────▶  milli.gold   price, price history, platform report, fees page, RSS feeds, help sitemap, posts
-```
-
-`milligold-mcp` runs locally and reads public, login-free parts of milli.gold: three JSON endpoints (live price,
-price widget series, overall report), the fees page, the news, magazine and help RSS feeds, the help sitemap and the
-post pages. There is no hosted server in between and no API key.
-
-- **Chrome-like client.** Requests go through a Chrome-impersonating HTTP client, because the site sits behind ArvanCloud.
-- **ArvanCloud 307 + cookie.** ArvanCloud sometimes answers with a redirect to the same URL plus a cookie. The server retries once and keeps the cookie, so you never see it.
-- **15 s cache.** Repeated calls within 15 seconds reuse the answer instead of hitting the site again.
-- **Read-only.** Only GET requests, only to milli.gold. System proxy variables are ignored on purpose.
-
 ## Good to know
 
 - **Units.** The site quotes `price18` in **Rial per milligram**, and 1 gram = 1000 mg. So 268,900 Rial/mg x 1000 = 268,900,000 Rial/g, and Rial / 10 = 26,890,000 Toman/g, which matches "price of 1 gram of 18k gold" on the site.
